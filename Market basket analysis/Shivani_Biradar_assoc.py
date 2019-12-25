@@ -7,16 +7,6 @@ import numpy as np
 def subsets(arr):
     return chain(*[combinations(arr, i + 1) for i, a in enumerate(arr)])
 
-sc = SparkContext("local[*]")
-input_file = sys.argv[1]
-support = int(sys.argv[2])
-
-data = sc.textFile(input_file)
-header = data.first()
-baskets = data.filter(lambda x: x != header).map(lambda x : x.split(",")).map(lambda x : (int(x[0]),int(x[1]))).groupByKey().map(lambda x: list(set(x[1])))
-totalCount = baskets.count()
-#print(baskets)
-numpartitions = baskets.getNumPartitions()
 def candidate_occurences(baskets, candidates):
 	count_dict = {}
 	baskets = list(baskets)
@@ -57,6 +47,7 @@ def get_candidate_items(frequentItems,k):
             else:
                 break
     return combs
+
 def get_frequent_items(baskets, candidatefrequentitems, sup_threshold):
     k_itemset_count_dict = {}
     for candidate in candidatefrequentitems:
@@ -72,8 +63,6 @@ def get_frequent_items(baskets, candidatefrequentitems, sup_threshold):
     kfrequentitems = {x : k_itemset_count[x] for x in k_itemset_count if k_itemset_count[x]>=sup_threshold}
     kfrequentitems = sorted(kfrequentitems)
     return kfrequentitems
-
-
 
 def apriori(baskets,support,totalCount):
     baskets = list(baskets)
@@ -101,39 +90,6 @@ def apriori(baskets,support,totalCount):
         k+=1
     return final_result
 
-
-map_output_phase1 = baskets.mapPartitions(lambda x: apriori(x,support,totalCount )).map(lambda x: (x,1))
-#temp = list(set(map_output_phase1))
-#print(len(map_output_phase1))
-
-#print(len(temp))
-reduce_output_phase1 = map_output_phase1.reduceByKey(lambda x,y: (1)).keys().collect()
-
-map_output_phase2 = baskets.mapPartitions(lambda x : candidate_occurences(x,reduce_output_phase1))
-reduce_output_phase2 = map_output_phase2.reduceByKey(lambda x,y: (x+y))
-final_res = reduce_output_phase2.filter(lambda x: x[1] >= support)
-freq_items_for_conf = final_res.map(lambda x:x[0]).collect()
-freq_items_count = final_res.collectAsMap()
-#print(freq_items_count)
-outputfile = open("Output.txt","w")
-
-frequent_items = final_res.map(lambda x:x[0]).map(lambda x: set(x)).collect()
-frequent_items = sorted(frequent_items, key = lambda x: (len(x), x))
-
-confidence_threshold = float(sys.argv[3])
-dict = {}
-#for I in freq_items_for_conf:
-   # for j in baskets:
-
-    #if I not in dict:
-     #   dict[I] = 1
-    #else:
-     #   dict[I] += 1
-
-
-
-#def getSupport(item):
- #   return float(dict[item]) / totalCount
 def conf_calc(baskets,freq_items_count,confidence_threshold):
     association_list = []
     baskets = list(baskets)
@@ -150,12 +106,35 @@ def conf_calc(baskets,freq_items_count,confidence_threshold):
 
     return association_list
 
+sc = SparkContext("local[*]")
+input_file = sys.argv[1]
+support = int(sys.argv[2])
+confidence_threshold = float(sys.argv[3])
+
+data = sc.textFile(input_file)
+header = data.first()
+baskets = data.filter(lambda x: x != header).map(lambda x : x.split(",")).map(lambda x : (int(x[0]),int(x[1]))).groupByKey().map(lambda x: list(set(x[1])))
+totalCount = baskets.count()
+numpartitions = baskets.getNumPartitions()
+
+
+map_output_phase1 = baskets.mapPartitions(lambda x: apriori(x,support,totalCount )).map(lambda x: (x,1))
+
+reduce_output_phase1 = map_output_phase1.reduceByKey(lambda x,y: (1)).keys().collect()
+
+map_output_phase2 = baskets.mapPartitions(lambda x : candidate_occurences(x,reduce_output_phase1))
+
+reduce_output_phase2 = map_output_phase2.reduceByKey(lambda x,y: (x+y))
+
+final_res = reduce_output_phase2.filter(lambda x: x[1] >= support)
+freq_items_for_conf = final_res.map(lambda x:x[0]).collect()
+freq_items_count = final_res.collectAsMap()
+frequent_items = final_res.map(lambda x:x[0]).map(lambda x: set(x)).collect()
+frequent_items = sorted(frequent_items, key = lambda x: (len(x), x))
+
 association = baskets.mapPartitions(lambda x: conf_calc(x,freq_items_count,confidence_threshold)).collect()
-print(association)
 
-
-
-
+outputfile = open("Output.txt","w")
 outputfile.write("Frequent Itemset")
 outputfile.write("\n\n")
 if len(frequent_items) != 0:
@@ -186,12 +165,4 @@ for p in association:
     outputfile.write(" ")
     outputfile.write(str(p[2]))
     outputfile.write("\n")
-
-#print(frequent_items)
-#for item in map_output_phase2:
- #   if item[1] >= support:
-  #      frequent_items.append(item[0])
-
-#print(frequent_items)
-
 
