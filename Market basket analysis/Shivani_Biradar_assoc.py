@@ -30,7 +30,7 @@ def candidate_occurences(baskets, candidates):
 def get_candidate_pairs(frequentItems):
     pairs = []
     for subset in combinations(frequentItems,2):
-        subset = list(subset)
+    	subset = list(subset)
         subset.sort()
         pairs.append(subset)
     return pairs
@@ -39,35 +39,35 @@ def get_candidate_items(frequentItems,k):
     combs = []
     frequentItems = list(frequentItems)
     for i in range(len(frequentItems)-1):
-        for j in range(i+1,len(frequentItems)):
-            a = frequentItems[i]
-            b = frequentItems[j]
-            if a[0:(k - 2)] == b[0:(k - 2)]:
-                combs.append(list(set(a) | set(b)))
-            else:
-                break
+    	for j in range(i+1,len(frequentItems)):
+        	a = frequentItems[i]
+        	b = frequentItems[j]
+        	if a[0:(k - 2)] == b[0:(k - 2)]:
+                	combs.append(list(set(a) | set(b)))
+            	else:
+                	break
     return combs
 
 def get_frequent_items(baskets, candidatefrequentitems, sup_threshold):
     k_itemset_count_dict = {}
     for candidate in candidatefrequentitems:
-        candidate = set(candidate)
-        key = tuple(sorted(candidate))
+    	candidate = set(candidate)
+    	key = tuple(sorted(candidate))
         for basket in baskets :
-            if candidate.issubset(basket):
-                if key in k_itemset_count_dict:
-                    k_itemset_count_dict[key]+=1
-                else:
-                    k_itemset_count_dict[key] = 1
+        	if candidate.issubset(basket):
+             		if key in k_itemset_count_dict:
+                    		k_itemset_count_dict[key]+=1
+                	else:
+                    		k_itemset_count_dict[key] = 1
     k_itemset_count = Counter(k_itemset_count_dict)
     kfrequentitems = {x : k_itemset_count[x] for x in k_itemset_count if k_itemset_count[x]>=sup_threshold}
     kfrequentitems = sorted(kfrequentitems)
     return kfrequentitems
 
-def apriori(baskets,support,totalCount):
+def apriori(baskets,support):
     baskets = list(baskets)
     sup_threshold = np.floor(float(support)/numpartitions)
-    #sup_threshold = support*(float(len(baskets))/float(totalCount))
+    
     final_result = []
     singleton = Counter()
     for basket in baskets:
@@ -90,19 +90,17 @@ def apriori(baskets,support,totalCount):
         k+=1
     return final_result
 
-def conf_calc(baskets,freq_items_count,confidence_threshold):
+def conf_calc(freq_items_count,confidence_threshold):
     association_list = []
-    baskets = list(baskets)
-    freq_items_for_conf = list(frequent_items)
     for value in freq_items_count.keys():
-        _subsets = map(frozenset,[x for x in subsets(value)])
+    	_subsets = map(frozenset,[x for x in subsets(value)])
         for element in _subsets:
-            remain = set(value).difference(set(element))
+        	remain = set(value).difference(set(element))
             if len(remain) > 0:
-                confidence = float(freq_items_count[tuple(value)]) / freq_items_count[tuple(element)]
-                if confidence >= confidence_threshold:
-                    rule=(remain,tuple(element),confidence)
-                    association_list.append(rule)
+            	confidence = float(freq_items_count[tuple(value)]) / freq_items_count[tuple(element)]
+            	if confidence >= confidence_threshold:
+                	rule=(remain,tuple(element),confidence)
+                	association_list.append(rule)
 
     return association_list
 
@@ -118,7 +116,7 @@ totalCount = baskets.count()
 numpartitions = baskets.getNumPartitions()
 
 
-map_output_phase1 = baskets.mapPartitions(lambda x: apriori(x,support,totalCount )).map(lambda x: (x,1))
+map_output_phase1 = baskets.mapPartitions(lambda x: apriori(x,support)).map(lambda x: (x,1))
 
 reduce_output_phase1 = map_output_phase1.reduceByKey(lambda x,y: (1)).keys().collect()
 
@@ -132,7 +130,7 @@ freq_items_count = final_res.collectAsMap()
 frequent_items = final_res.map(lambda x:x[0]).map(lambda x: set(x)).collect()
 frequent_items = sorted(frequent_items, key = lambda x: (len(x), x))
 
-association = baskets.mapPartitions(lambda x: conf_calc(x,freq_items_count,confidence_threshold)).collect()
+association = baskets.mapPartitions(lambda x: conf_calc(freq_items_count,confidence_threshold)).collect()
 
 outputfile = open("Output.txt","w")
 outputfile.write("Frequent Itemset")
